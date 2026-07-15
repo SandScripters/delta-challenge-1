@@ -1,0 +1,74 @@
+name: Delta Challenge 1 — Autograder
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+        pip install nbformat nbconvert
+
+    - name: Execute notebook
+      run: |
+        jupyter nbconvert --to notebook --execute delta_challenge_1.ipynb \
+          --output delta_challenge_1_executed.ipynb \
+          --ExecutePreprocessor.timeout=120
+      continue-on-error: true
+
+    - name: Run autograder tests
+      run: |
+        pytest tests/test_delta1.py -v \
+          --tb=short \
+          --no-header \
+          -rN \
+          2>&1 | tee grading_results.txt
+
+    - name: Show results
+      run: |
+        echo "================================================"
+        echo "نتائج التحدي | Challenge Results"
+        echo "================================================"
+        
+        PASSED=$(grep -c "PASSED" grading_results.txt || true)
+        FAILED=$(grep -c "FAILED" grading_results.txt || true)
+        TOTAL=$((PASSED + FAILED))
+        
+        echo "✓ نجح | Passed: $PASSED / $TOTAL"
+        echo "✗ فشل | Failed: $FAILED / $TOTAL"
+        
+        if [ "$FAILED" -eq "0" ]; then
+          echo ""
+          echo "🎉 أكملت تحدي دلتا الأول! | You completed Delta Challenge One!"
+          echo "🎉 ملفك على GitHub يظهر الآن أول مشروع حقيقي لك."
+          echo "🎉 Your GitHub profile now shows your first real project."
+          echo ""
+          echo "الخطوة التالية | Next Step:"
+          echo "istidama-consulting.com/program"
+        else
+          echo ""
+          echo "💪 أكمل المحاولة — لديك $FAILED اختبار متبقٍّ | Keep going — $FAILED tests remaining"
+          cat grading_results.txt | grep "FAILED" || true
+        fi
+
+    - name: Upload results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: grading-results
+        path: grading_results.txt
